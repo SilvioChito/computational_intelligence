@@ -79,4 +79,4 @@ In the following plot we have on the y axis the fitness percentage, while on the
 
 
 ## Have fun
-Made with ❤️ love by [Michelangelo Caretto](https://github.com/rasenqt/computational_intelligence23_24) and [Silvio Chito](https://github.com/SilvioChito/computational_intelligence)   
+Made with ❤️ by [Michelangelo Caretto](https://github.com/rasenqt/computational_intelligence23_24) and [Silvio Chito](https://github.com/SilvioChito/computational_intelligence)   
