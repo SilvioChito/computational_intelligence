@@ -71,3 +71,12 @@ In the following plot we have on the y axis the fitness percentage, while on the
 
 
 ![Alt text](output.png)
+
+
+
+
+
+
+
+## Have fun
+Made with ❤️ love by [Michelangelo Caretto](https://github.com/rasenqt/computational_intelligence23_24) and [Silvio Chito](https://github.com/SilvioChito/computational_intelligence)   
