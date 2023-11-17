@@ -23,10 +23,7 @@ To implement the Nim Reverse Problem as an evolutionary strategy we followed the
 
  - Replacement: if the current generation best solution (set of weights) is better than the one we started from, we replace it. 
 
- - Termination: we run a cycle composed by n integer division λ
-
-Therefore, we adopted a (1 + λ) ES.
-
+ - Termination: we run a cycle composed by N integer division λ
 
 ## Developed strategies
 # Enemy strategies
@@ -48,4 +45,4 @@ Every strategy is represented by a tuple composed of a real number (the weight) 
 For each move we assign a different weight, and the final move will be the one with the higher weight. In case we have the same move with different weight, we add up the weights and consider them as a single move.
 
 ## Final results
-To be continued...
+In the end, we can compare the initial weight value with the current one, and notice how the weights have been changed based on which rule has been the "strongest": this means that this rule has been used a lot in order to get "locally" to the best configuration.
