@@ -4,9 +4,6 @@
 
 This project implements the game of Tic Tac Toe using Q Reinforcement Learning. The agent learns to make optimal moves by updating Q-values based on rewards obtained during gameplay. Unlike traditional methods, this implementation employs a fixed probability for choosing actions at each state by exploiting the epsilon-greedy strategy. Additionally, rewards are calculated by considering the consequences of letting the opponent have an advantage over a certain actions.
 
-## Q Table
-
-
 ## Reward strategy
 For each action, the algorithm can obtain different kind of rewards at the same time (based on different scenarios due to the action taken), which are then summed up.
 I've used the following rewards regarding the training phase:
@@ -20,3 +17,4 @@ I've used the following rewards regarding the training phase:
 *by action i mean choosing a certain cell 
 
 ## Results
+By training the algorithm with 100000 games against a random player, i managed to reach a 71% accuracy (winning rate) against a random player
