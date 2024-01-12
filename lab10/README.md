@@ -17,4 +17,4 @@ I've used the following rewards regarding the training phase:
 *by action i mean choosing a certain cell 
 
 ## Results
-By training the algorithm with 100000 games against a random player, i managed to reach a 71% accuracy (winning rate) against a random player
+By training the algorithm with 100000 games against a random player, the algorithm managed to reach a 71% accuracy (winning rate) against a random player
