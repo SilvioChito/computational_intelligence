@@ -6,6 +6,7 @@ from torch import nn
 import random
 import numpy as np
 import torch
+import torch.nn.init as init
 
 # Rules on PDF
 
@@ -19,7 +20,9 @@ class QuixoNet(nn.Module):
             nn.ReLU(),
             nn.Linear(100, 44),
         )
-
+        for layer in self.linear_relu_stack:
+                    if isinstance(layer, nn.Linear):
+                        init.xavier_uniform_(layer.weight)
     def forward(self, x):
         logits = self.linear_relu_stack(x)
         return logits
@@ -53,6 +56,43 @@ class Player(ABC):
         '''
     pass
 
+class TrainedPlayer(Player):
+    def __init__(self, trained_params) -> None:
+        super().__init__()
+        self.device = ("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.GeneratorNet = QuixoNet().to(self.device)
+        self.GeneratorNet.load_state_dict(trained_params) # TRAINED NETWORK to use in INFERENCE PHASE
+        
+    def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
+        nn_input = game.get_flat_board()
+        nn_input = torch.tensor(nn_input, dtype=torch.float32).to(self.device)
+        out = self.GeneratorNet(nn_input) # ritorna 44 uscite, da qui ricavare il numero dell'azione e la direzione della migliori
+        out = out.cpu().detach().numpy()
+        #print(out)
+        index = np.argsort(out)
+        pos,move=0,0
+        from_pos=(0,0)
+        sorted_index = index[::-1]
+        #aggiunta
+        no_valid_action = True
+    
+        for _index in sorted_index:
+            pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
+            from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
+            #action=out[_index]
+            self.last_action_value = out[_index]
+            self.last_action_number=_index
+            ok = game._Game__move(from_pos, move, game.current_player_idx)
+            
+            if ok:
+                no_valid_action = False
+                break
+            
+        if no_valid_action:
+            return (-1, -1)
+        
+        return  (from_pos, move) #,action
+
 
 class RandomPlayer(Player):
     def __init__(self) -> None:
@@ -72,12 +112,16 @@ class MyPlayer(Player):
     def __init__(self) -> None:
         super().__init__()
         # inserisci qui la rete
-        self.device = ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = ("cuda:0" if torch.cuda.is_available() else "cpu")
         self.GeneratorNet = QuixoNet().to(self.device)
         self.TargetNet = QuixoNet().to(self.device)
-        self.criterion = nn.MSELoss()
-        self.optimizer = torch.optim.SGD(self.GeneratorNet.parameters(), lr=0.001, momentum=0.9)
+        self.criterion = nn.SmoothL1Loss().to(self.device)
+        #self.criterion = nn.MSELoss()
+        #self.optimizer = torch.optim.SGD(self.GeneratorNet.parameters(), lr=0.001, momentum=0.9)
+        self.optimizer = torch.optim.Adam(self.GeneratorNet.parameters(), lr=0.001)
+
         self.last_action_value = 0.0
+        self.last_action_number=0
         
     def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
         nn_input = game.get_flat_board()
@@ -95,20 +139,28 @@ class MyPlayer(Player):
             from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
             #action=out[_index]
             self.last_action_value = out[_index]
+            self.last_action_number=_index
             ok = game._Game__move(from_pos, move, game.current_player_idx)
             
             if ok:
-                break 
+                break
+            
              
         return  (from_pos, move) #,action
     
     def myplayer_zero_grad(self):
-        self.GeneratorNet.zero_grad()
-            
+          self.optimizer.zero_grad()
+          
+    def downstream(self,game: 'Game',net: QuixoNet):
+         tensor=torch.tensor(game.get_flat_board(), dtype=torch.float32).to(self.device)
+         output=net(tensor)
+         return output
+         
     def myplayer_loss_and_update_params(self, GeneratorNet_outputs, TargetNet_targets):
         loss = self.criterion(GeneratorNet_outputs, TargetNet_targets)
         loss.backward()
         self.optimizer.step()
+        return loss
         
     def copy_params_TargetNet(self):
         self.TargetNet.load_state_dict(self.GeneratorNet.state_dict())
@@ -133,6 +185,11 @@ class MyPlayer(Player):
                 break 
              
         return  action_val
+    
+
+
+
+
 
  
  
@@ -324,12 +381,10 @@ class Game(object):
             return self._board[0, -1]
         return -1
     
-
-
     def check_is_winning(self,from_pos,slide) -> int:  #return 1 for player 1 or 0 for player 0
         '''Check the winner. Returns the player ID of the winner if any, otherwise returns -1'''
         self=deepcopy(self)
-        accetable=self.__slide(from_pos,slide);
+        #accetable=self.__slide(from_pos,slide);
         #def __move(self, from_pos: tuple[int, int], slide: Move, player_id: int) -> bool:
         # for each row
         for x in range(self._board.shape[0]):
@@ -365,29 +420,29 @@ class Game(object):
         # for each row
             for x in range(self._board.shape[0]):
                 # if a player has completed an entire row
-                if self._board[x, 0] != -1 and sum(self._board[x, :] == self._board[x, 0]) >= n:
+                if self._board[x, 0] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
                     # self the relative id
-                    return self._board[x, 0]
+                    return 1
             # for each column
             for y in range(self._board.shape[1]):
                 # if a player has completed an entire column
-                if self._board[0, y] != -1 and sum(self._board[x, :] == self._board[x, 0]) >= n:
+                if self._board[0, y] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
                     # return the relative id
-                    return self._board[0, y]
+                    return 1
             # if a player has completed the principal diagonal
-            if self._board[0, 0] != -1 and sum(
+            if self._board[0, 0] == 0 and sum(
                 [self._board[x, x]
                     for x in range(self._board.shape[0])] == self._board[0, 0]
             )>=n:
                 # return the relative id
-                return self._board[0, 0]
+                return 1
             # if a player has completed the secondary diagonal
-            if self._board[0, -1] != -1 and sum(
+            if self._board[0, -1] == 0 and sum(
                 [self._board[x, -(x + 1)]
                 for x in range(self._board.shape[0])] == self._board[0, -1]
             )>=n:
                 # return the relative id
-                return self._board[0, -1]
+                return 1
             return -1
     
     def check_3_pattern(self, from_pos, slide) -> int:  #return 1 for player 1 or 0 for player 0
@@ -399,29 +454,29 @@ class Game(object):
         # for each row
             for x in range(self._board.shape[0]):
                 # if a player has completed an entire row
-                if self._board[x, 0] != -1 and sum(self._board[x, :] == self._board[x, 0]) >= n:
+                if self._board[x, 0] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
                     # return the relative id
-                    return self._board[x, 0]
+                    return 1
             # for each column
             for y in range(self._board.shape[1]):
                 # if a player has completed an entire column
-                if self._board[0, y] != -1 and sum(self._board[x, :] == self._board[x, 0]) >= n:
+                if self._board[0, y] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
                     # return the relative id
-                    return self._board[0, y]
+                    return 1
             # if a player has completed the principal diagonal
-            if self._board[0, 0] != -1 and sum(
+            if self._board[0, 0] == 0 and sum(
                 [self._board[x, x]
                     for x in range(self._board.shape[0])] == self._board[0, 0]
             )>=n:
                 # return the relative id
-                return self._board[0, 0]
+                return 1
             # if a player has completed the secondary diagonal
-            if self._board[0, -1] != -1 and sum(
+            if self._board[0, -1] == 0 and sum(
                 [self._board[x, -(x + 1)]
                 for x in range(self._board.shape[0])] == self._board[0, -1]
             )>=n:
                 # return the relative id
-                return self._board[0, -1]
+                return 1
             return -1
     
     def check_4_pattern(self, from_pos, slide) -> int:  #return 1 for player 1 or 0 for player 0
@@ -434,49 +489,56 @@ class Game(object):
         # for each row
             for x in range(self._board.shape[0]):
                 # if a player has completed an entire row
-                if self._board[x, 0] != -1 and sum(self._board[x, :] == self._board[x, 0]) >= n:
+                if self._board[x, 0] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
                     # return the relative id
-                    return self._board[x, 0]
+                    return 1
             # for each column
             for y in range(self._board.shape[1]):
                 # if a player has completed an entire column
-                if self._board[0, y] != -1 and sum(self._board[x, :] == self._board[x, 0]) >= n:
+                if self._board[0, y] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
                     # return the relative id
-                    return self._board[0, y]
+                    return 1
             # if a player has completed the principal diagonal
-            if self._board[0, 0] != -1 and sum(
+            if self._board[0, 0] == 0 and sum(
                 [self._board[x, x]
                     for x in range(self._board.shape[0])] == self._board[0, 0]
             )>=n:
                 # return the relative id
-                return self._board[0, 0]
+                return 1
             # if a player has completed the secondary diagonal
-            if self._board[0, -1] != -1 and sum(
+            if self._board[0, -1] == 0  and sum(
                 [self._board[x, -(x + 1)]
                 for x in range(self._board.shape[0])] == self._board[0, -1]
             )>=n:
                 # return the relative id
-                return self._board[0, -1]
+                return 1
             return -1
     
-
-    
-
-
     def play(self, player1: Player, player2: Player):
         '''Play the game. Returns the winning player'''
         players = [player1, player2]
         winner = -1
+        
         while winner < 0:
             self.current_player_idx += 1
             self.current_player_idx %= len(players)
+            
             ok = False
             while not ok:
                 from_pos, slide = players[self.current_player_idx].make_move(
                     self)
-                ok = self._Game__move(from_pos, slide, self.current_player_idx)
                 
-            winner = self.check_winner()
+                if from_pos!=-1 or slide!=-1:
+                    ok = self._Game__move(from_pos, slide, self.current_player_idx)
+                    winner = self.check_winner()
+                else: 
+                    winner = -2
+                    print("miao")
+                    break
+
+            if self.check_winner() != -1:
+                break
+
         return winner
 
     def play_ql(self, player1: Player, player2: Player):
@@ -595,8 +657,7 @@ class Game(object):
             if acceptable:
                 return 0
             return -15
-            
-        
+             
     def __take_rotation(self, from_pos: tuple[int, int], player_id: int) -> bool:
             '''Take only from the first row and first column because of the rotation'''
             # acceptable only if in border
@@ -786,25 +847,25 @@ class Game(object):
         
         return [self._board,rotate_matrix_90, rotate_matrix_180, rotate_matrix_270]
 
-
-
     def  compute_reward(self,from_pos, slide) -> int :
         '''Return  the sum of  maximium between positive rewards and the minimium between the negative one's  '''
-        """
+        reward=0.1
+        '''
         if self.check_2_pattern(from_pos,slide):
-            reward2= 0.2;
+            reward= 0.2
             
         if self.check_3_pattern(from_pos,slide):
-            reward3= 0.3;
+            reward= 0.3;
             
         if self.check_4_pattern(from_pos,slide):
-            reward4= 0.4;
+            reward= 0.4;
 
-        """
-        reward = 0
-        if self.check_is_winning(from_pos,slide):
-            reward = 5
-        else: reward = 0
+     
+        '''
+        if self.check_is_winning(from_pos,slide)==0:
+            reward = 1
+        if self.check_is_winning(from_pos,slide)==1:
+            reward =-1
         
 
         #reward6=self.__accettable(from_pos,slide,num)
