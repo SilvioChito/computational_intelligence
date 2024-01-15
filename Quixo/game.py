@@ -18,11 +18,13 @@ class QuixoNet(nn.Module):
             nn.ReLU(),
             nn.Linear(100, 100),
             nn.ReLU(),
+            nn.Dropout(0.5),
             nn.Linear(100, 44),
         )
         for layer in self.linear_relu_stack:
                     if isinstance(layer, nn.Linear):
                         init.xavier_uniform_(layer.weight)
+                        
     def forward(self, x):
         logits = self.linear_relu_stack(x)
         return logits
@@ -78,13 +80,15 @@ class MyPlayer(Player):
         self.device = ("cuda:0" if torch.cuda.is_available() else "cpu")
         self.GeneratorNet = QuixoNet().to(self.device)
         self.TargetNet = QuixoNet().to(self.device)
-        self.criterion = nn.SmoothL1Loss().to(self.device)
-        #self.criterion = nn.MSELoss()
+        #self.criterion = nn.SmoothL1Loss().to(self.device)
+        self.criterion = nn.HuberLoss().to(self.device)
+        #self.criterion = nn.MSELoss().to(self.device)
         #self.optimizer = torch.optim.SGD(self.GeneratorNet.parameters(), lr=0.001, momentum=0.9)
-        self.optimizer = torch.optim.Adam(self.GeneratorNet.parameters(), lr=0.001)
+        self.optimizer = torch.optim.Adam(self.GeneratorNet.parameters(), lr=0.0001)
 
         self.last_action_value = 0.0
         self.last_action_number=0
+        self.step=1.0
         
         
     def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
@@ -107,10 +111,49 @@ class MyPlayer(Player):
             ok = game._Game__move(from_pos, move, game.current_player_idx)
             
             if ok:
-                break
-            
-             
+                break     
         return  (from_pos, move) #,action
+     
+
+    def make_move2(self, game: 'Game') -> tuple[tuple[int, int], Move]:
+        decay_rate = 0.99
+        self.step = max(0.1, self.step* decay_rate)
+
+
+        if np.random.random() < self.step: #epsilon
+            nn_input = game.get_flat_board()
+            nn_input = torch.tensor(nn_input, dtype=torch.float32).to(self.device)
+            out = self.GeneratorNet(nn_input) # ritorna 44 uscite, da qui ricavare il numero dell'azione e la direzione della migliori
+            out = out.cpu().detach().numpy()
+            #print(out)
+            index = np.argsort(out)
+            pos,move=0,0
+            from_pos=(0,0)
+            sorted_index = index[::-1]
+        
+            for _index in sorted_index:
+                pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
+                from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
+                #action=out[_index]
+                self.last_action_value = out[_index]
+                self.last_action_number=_index
+                ok = game._Game__move(from_pos, move, game.current_player_idx)
+                
+                if ok:
+                    break
+                
+                
+            return  (from_pos, move) #,action
+        
+        else: 
+            ok=False
+            while not ok:
+                    from_pos = (random.randint(0, 4), random.randint(0, 4))
+                    move = random.choice([Move.TOP, Move.BOTTOM, Move.LEFT, Move.RIGHT])
+                    ok = game._Game__move(from_pos, move, game.current_player_idx)   
+                    self.last_action_number=translate_position_to_number(from_pos)
+            return (from_pos, move)
+    
     
     def myplayer_zero_grad(self):
           self.optimizer.zero_grad()
@@ -142,7 +185,7 @@ class MyPlayer(Player):
         action_val = 0
        
         for _index in sorted_index:
-            pos, move=translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
+            pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
             from_pos=translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
             action_val = out[_index]
             ok = game._Game__move(from_pos, move, game.current_player_idx)   
@@ -154,6 +197,43 @@ class MyPlayer(Player):
  
  
     ##translate into (Position,Move)
+
+
+class TrainedPlayer(Player):
+    def __init__(self) -> None:
+        super().__init__()
+        # inserisci qui la rete
+        self.device = ("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.GeneratorNet = QuixoNet().to(self.device)
+       
+        
+        
+    def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
+        nn_input = game.get_flat_board()
+        nn_input = torch.tensor(nn_input, dtype=torch.float32).to(self.device)
+        out = self.GeneratorNet(nn_input) # ritorna 44 uscite, da qui ricavare il numero dell'azione e la direzione della migliori
+        out = out.cpu().detach().numpy()
+        #print(out)
+        index = np.argsort(out)
+        pos,move=0,0
+        from_pos=(0,0)
+        sorted_index = index[::-1]
+       
+        for _index in sorted_index:
+            pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
+            from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
+            #action=out[_index]
+            self.last_action_value = out[_index]
+            self.last_action_number=_index
+            ok = game._Game__move(from_pos, move, game.current_player_idx)
+            
+            if ok:
+                break
+            
+             
+        return  (from_pos, move) #,action
+
+    
 def translate_number_to_position_direction(number)->tuple[int,Move]:
         #CASELLA 1 TOP LEFT CORNER
         if number == 1:
@@ -285,6 +365,21 @@ def translate_number_to_position(number)->tuple[int, int]:
        else:
          return None
        
+def translate_position_to_number(position: tuple[int, int]) -> int:
+    '''Translate row, col into Position (1-16)'''
+    row, col = position
+    if 0 <= row <= 4 and 0 <= col <= 4:
+        if row == 0:
+            return col + 1
+        elif col == 4:
+            return 5 + row
+        elif row == 4:
+            return 9 + (4 - col)
+        elif col == 0:
+            return 13 + (4 - row)
+    return None
+       
+       
 
 class Game(object):
     def __init__(self) -> None:
@@ -297,11 +392,11 @@ class Game(object):
         '''
         return deepcopy(self._board)
     
-    def get_flat_board(self) :
+    def get_flat_board(self) : # DA SPOSTARE
         nn_input = deepcopy(self._board.flatten())
         return nn_input
 
-    def get_current_player(self) -> int:
+    def get_current_player(self) -> int: 
         '''
         Returns the current player
         '''
@@ -311,7 +406,7 @@ class Game(object):
         '''Prints the board. -1 are neutral pieces, 0 are pieces of player 0, 1 pieces of player 1'''
         print(self._board)
 
-    def check_winner(self) -> int:  #return 1 for player 1 or 0 for player 0
+    def check_winner(self) -> int:  #return 1 for player 1 or 0 for player                           # DA SPOSTARE
         '''Check the winner. Returns the player ID of the winner if any, otherwise returns -1'''
         # for each row
         for x in range(self._board.shape[0]):
