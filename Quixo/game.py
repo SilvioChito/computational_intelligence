@@ -80,8 +80,8 @@ class MyPlayer(Player):
         self.device = ("cuda:0" if torch.cuda.is_available() else "cpu")
         self.GeneratorNet = QuixoNet().to(self.device)
         self.TargetNet = QuixoNet().to(self.device)
-        #self.criterion = nn.SmoothL1Loss().to(self.device)
-        self.criterion = nn.HuberLoss().to(self.device)
+        self.criterion = nn.SmoothL1Loss().to(self.device)
+        #self.criterion = nn.HuberLoss().to(self.device)
         #self.criterion = nn.MSELoss().to(self.device)
         #self.optimizer = torch.optim.SGD(self.GeneratorNet.parameters(), lr=0.001, momentum=0.9)
         self.optimizer = torch.optim.Adam(self.GeneratorNet.parameters(), lr=0.0001)
@@ -102,16 +102,20 @@ class MyPlayer(Player):
         from_pos=(0,0)
         sorted_index = index[::-1]
        
+        try_game = deepcopy(game)
+
         for _index in sorted_index:
             pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
             from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
             #action=out[_index]
             self.last_action_value = out[_index]
             self.last_action_number=_index
-            ok = game._Game__move(from_pos, move, game.current_player_idx)
+
+            ok = try_game._Game__move(from_pos, move, game.current_player_idx)
             
             if ok:
-                break     
+                break    
+
         return  (from_pos, move) #,action
      
 
@@ -406,7 +410,7 @@ class Game(object):
         '''Prints the board. -1 are neutral pieces, 0 are pieces of player 0, 1 pieces of player 1'''
         print(self._board)
 
-    def check_winner(self) -> int:  #return 1 for player 1 or 0 for player                           # DA SPOSTARE
+    def check_winner(self) -> int:
         '''Check the winner. Returns the player ID of the winner if any, otherwise returns -1'''
         # for each row
         for x in range(self._board.shape[0]):
@@ -572,8 +576,6 @@ class Game(object):
             return -1
     
 
-    
-
 
     def play(self, player1: Player, player2: Player):
         '''Play the game. Returns the winning player'''
@@ -583,29 +585,15 @@ class Game(object):
             self.current_player_idx += 1
             self.current_player_idx %= len(players)
             ok = False
-           # while not ok:
-            from_pos, slide = players[self.current_player_idx].make_move(
-                    self)
-                #ok = self._Game__move(from_pos, slide, self.current_player_idx)
+            
+            while not ok:
+                from_pos, slide = players[self.current_player_idx].make_move(
+                        self)
+                ok = self._Game__move(from_pos, slide, self.current_player_idx)
                 
             winner = self.check_winner()
         return winner
 
-    def play_ql(self, player1: Player, player2: Player):
-        '''Play the game. Returns the winning player'''
-        players = [player1, player2]
-        winner = -1
-        while winner < 0:
-            self.current_player_idx += 1
-            self.current_player_idx %= len(players)
-            ok = False
-            while not ok:
-                from_pos, slide = players[self.current_player_idx].make_move(
-                    self)
-                ok = self._Game__move(from_pos, slide, self.current_player_idx)
-            
-            winner = self.check_winner()
-        return winner
     
     def __move(self, from_pos: tuple[int, int], slide: Move, player_id: int) -> bool:
         '''Perform a move'''
@@ -620,18 +608,6 @@ class Game(object):
                 self._board[(from_pos[0], from_pos[1])] = deepcopy(prev_value)
         return acceptable
     
-    def __move_rotation(self, from_pos: tuple[int, int], slide: Move, player_id: int) -> bool:
-        '''Perform a move'''
-        if player_id > 2:
-            return False
-        # Oh God, Numpy arrays
-        prev_value = deepcopy(self._board[(from_pos[1], from_pos[0])])
-        acceptable = self.__take_rotation((from_pos[1], from_pos[0]), player_id)
-        if acceptable:
-            acceptable = self.__slide_rotation((from_pos[1], from_pos[0]), slide)
-            if not acceptable:
-                self._board[(from_pos[1], from_pos[0])] = deepcopy(prev_value)
-        return acceptable
 
     def __take(self, from_pos: tuple[int, int], player_id: int) -> bool:
         '''Take piece'''
@@ -650,78 +626,7 @@ class Game(object):
         if acceptable:
             self._board[from_pos] = player_id
         return acceptable
-    
-    def __accettable(self, from_pos: tuple[int, int], slide: Move, player_id: int) -> bool:
-        '''Look for invalid move on position and direction'''
-        ##Look if u can take the piece
-        # acceptable only if in border
-        acceptable: bool = (
-            # check if it is in the first row
-            (from_pos[0] == 0 and from_pos[1] < 5)
-            # check if it is in the last row
-            or (from_pos[0] == 4 and from_pos[1] < 5)
-            # check if it is in the first column
-            or (from_pos[1] == 0 and from_pos[0] < 5)
-            # check if it is in the last column
-            or (from_pos[1] == 4 and from_pos[0] < 5)
-            # and check if the piece can be moved by the current player
-        ) and (self._board[from_pos] < 0 or self._board[from_pos] == player_id)
-        if acceptable:
-        
-            SIDES = [(0, 0), (0, 4), (4, 0), (4, 4)]
-            # if the piece position is not in a corner
-            if from_pos not in SIDES:
-                # if it is at the TOP, it can be moved down, left or right
-                acceptable_top: bool = from_pos[0] == 0 and (
-                    slide == Move.BOTTOM or slide == Move.LEFT or slide == Move.RIGHT
-                )
-                # if it is at the BOTTOM, it can be moved up, left or right
-                acceptable_bottom: bool = from_pos[0] == 4 and (
-                    slide == Move.TOP or slide == Move.LEFT or slide == Move.RIGHT
-                )
-                # if it is on the LEFT, it can be moved up, down or right
-                acceptable_left: bool = from_pos[1] == 0 and (
-                    slide == Move.BOTTOM or slide == Move.TOP or slide == Move.RIGHT
-                )
-                # if it is on the RIGHT, it can be moved up, down or left
-                acceptable_right: bool = from_pos[1] == 4 and (
-                    slide == Move.BOTTOM or slide == Move.TOP or slide == Move.LEFT
-                )
-            # if the piece position is in a corner
-            else:
-                # if it is in the upper left corner, it can be moved to the right and down
-                acceptable_top: bool = from_pos == (0, 0) and (
-                    slide == Move.BOTTOM or slide == Move.RIGHT)
-                # if it is in the lower left corner, it can be moved to the right and up
-                acceptable_left: bool = from_pos == (4, 0) and (
-                    slide == Move.TOP or slide == Move.RIGHT)
-                # if it is in the upper right corner, it can be moved to the left and down
-                acceptable_right: bool = from_pos == (0, 4) and (
-                    slide == Move.BOTTOM or slide == Move.LEFT)
-                # if it is in the lower right corner, it can be moved to the left and up
-                acceptable_bottom: bool = from_pos == (4, 4) and (
-                    slide == Move.TOP or slide == Move.LEFT)
-            # check if the move is acceptable
-            acceptable: bool = acceptable_top or acceptable_bottom or acceptable_left or acceptable_right
-            # if it is
-            if acceptable:
-                return 0
-            return -15
             
-        
-    def __take_rotation(self, from_pos: tuple[int, int], player_id: int) -> bool:
-            '''Take only from the first row and first column because of the rotation'''
-            # acceptable only if in border
-            acceptable: bool = (
-                    # check if it is in the first row
-                    (from_pos[0] == 0 and from_pos[1] < 5)
-                    # check if it is in the first column
-                    or (from_pos[1] == 0 and from_pos[0] < 5)
-                    # and check if the piece can be moved by the current player
-            ) and (self._board[from_pos] < 0 or self._board[from_pos] == player_id)
-            if acceptable:
-                self._board[from_pos] = player_id
-            return acceptable
 
     def __slide(self, from_pos: tuple[int, int], slide: Move) -> bool:
             '''Slide the other pieces'''
@@ -804,99 +709,6 @@ class Game(object):
                     # move the piece down
                     self._board[(self._board.shape[0] - 1, from_pos[1])] = piece
             return acceptable
-    
-    def __slide_rotation(self, from_pos: tuple[int, int], slide: Move) -> bool:
-        '''Slide the other pieces'''
-        # define the corners
-        SIDES = [(0, 0), (0, 4), (4, 0), (4, 4)]
-        # if the piece position is not in a corner
-        if from_pos not in SIDES:
-            # if it is at the TOP, it can be moved down, left or right
-            acceptable_top: bool = from_pos[0] == 0 and (
-                slide == Move.BOTTOM or slide == Move.LEFT or slide == Move.RIGHT
-            )
-            # if it is on the LEFT, it can be moved up, down or right
-            acceptable_left: bool = from_pos[1] == 0 and (
-                slide == Move.BOTTOM or slide == Move.TOP or slide == Move.RIGHT
-            )
-            acceptable_right:bool = False
-            
-        # if the piece position is in a corner
-        else:
-            # if it is in the upper left corner, it can be moved to the right and down
-            acceptable_top: bool = from_pos == (0, 0) and (
-                slide == Move.BOTTOM or slide == Move.RIGHT)
-            # if it is in the lower left corner, it can be moved to the right and up
-            acceptable_left: bool = from_pos == (4, 0) and (
-                slide == Move.TOP or slide == Move.RIGHT)
-            # if it is in the upper right corner, it can be moved to the left and down
-            acceptable_right: bool = from_pos == (0, 4) and (
-                slide == Move.BOTTOM or slide == Move.LEFT)
-    
-        # check if the move is acceptable
-        acceptable: bool = acceptable_top or acceptable_left or acceptable_right
-        # if it is
-        if acceptable:
-            # take the piece
-            piece = self._board[from_pos]
-            # if the player wants to slide it to the left
-            if slide == Move.LEFT:
-                # for each column starting from the column of the piece and moving to the left
-                for i in range(from_pos[1], 0, -1):
-                    # copy the value contained in the same row and the previous column
-                    self._board[(from_pos[0], i)] = self._board[(
-                        from_pos[0], i - 1)]
-                # move the piece to the left
-                self._board[(from_pos[0], 0)] = piece
-            # if the player wants to slide it to the right
-            elif slide == Move.RIGHT:
-                # for each column starting from the column of the piece and moving to the right
-                for i in range(from_pos[1], self._board.shape[1] - 1, 1):
-                    # copy the value contained in the same row and the following column
-                    self._board[(from_pos[0], i)] = self._board[(
-                        from_pos[0], i + 1)]
-                # move the piece to the right
-                self._board[(from_pos[0], self._board.shape[1] - 1)] = piece
-            # if the player wants to slide it upward
-            elif slide == Move.TOP:
-                # for each row starting from the row of the piece and going upward
-                for i in range(from_pos[0], 0, -1):
-                    # copy the value contained in the same column and the previous row
-                    self._board[(i, from_pos[1])] = self._board[(
-                        i - 1, from_pos[1])]
-                # move the piece .
-                    
-                    
-                self._board[(0, from_pos[1])] = piece
-            # if the player wants to slide it downward
-            elif slide == Move.BOTTOM:
-                # for each row starting from the row of the piece and going downward
-                for i in range(from_pos[0], self._board.shape[0] - 1, 1):
-                    # copy the value contained in the same column and the following row
-                    self._board[(i, from_pos[1])] = self._board[(
-                        i + 1, from_pos[1])]
-                # move the piece down
-                self._board[(self._board.shape[0] - 1, from_pos[1])] = piece
-        return acceptable
-    
-    def rotate_multiple_matrix(self):
-        '''Return the board with different rotation such as  original_board,rotate_board_90, rotate_board_180, rotate_board_270 '''
-        row = len(self._board)
-        col = len(self._board[0])
-
-        # Creazione di una nuova matrix vuota con col e row invertite
-        rotate_matrix_90 = [[0] * row for _ in range(col)]
-        rotate_matrix_180 = [[0] * row for _ in range(col)]
-        rotate_matrix_270 = [[0] * row for _ in range(col)]
-
-        # Applicazione delle rotazioni
-        for i in range(row):
-            for j in range(col):
-                rotate_matrix_90[j][row - 1 - i] = self._board[i][j]
-                rotate_matrix_180[row - 1 - i][col - 1 - j] = self._board[i][j]
-                rotate_matrix_270[col - 1 - j][i] = self._board[i][j]
-        
-        return [self._board,rotate_matrix_90, rotate_matrix_180, rotate_matrix_270]
 
 
 
