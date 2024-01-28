@@ -65,11 +65,14 @@ class RandomPlayer(Player):
 
     def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
        ok=False
+       #try_game = deepcopy(game)
+
        while not ok:
+              try_game = deepcopy(game)
               from_pos = (random.randint(0, 4), random.randint(0, 4))
               move = random.choice([Move.TOP, Move.BOTTOM, Move.LEFT, Move.RIGHT])
-              ok = game._Game__move(from_pos, move, game.current_player_idx)   
-
+              ok = try_game._Game__move(from_pos, move, game.current_player_idx)   
+            
        return (from_pos, move)
 
 
@@ -84,7 +87,7 @@ class MyPlayer(Player):
         #self.criterion = nn.HuberLoss().to(self.device)
         #self.criterion = nn.MSELoss().to(self.device)
         #self.optimizer = torch.optim.SGD(self.GeneratorNet.parameters(), lr=0.001, momentum=0.9)
-        self.optimizer = torch.optim.Adam(self.GeneratorNet.parameters(), lr=0.0001)
+        self.optimizer = torch.optim.Adam(self.GeneratorNet.parameters(), lr=0.01)
 
         self.last_action_value = 0.0
         self.last_action_number=0
@@ -101,10 +104,11 @@ class MyPlayer(Player):
         pos,move=0,0
         from_pos=(0,0)
         sorted_index = index[::-1]
-       
-        try_game = deepcopy(game)
+      
+        #try_game = deepcopy(game)
 
         for _index in sorted_index:
+            try_game = deepcopy(game)
             pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
             from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
             #action=out[_index]
@@ -211,7 +215,6 @@ class TrainedPlayer(Player):
         self.GeneratorNet = QuixoNet().to(self.device)
        
         
-        
     def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
         nn_input = game.get_flat_board()
         nn_input = torch.tensor(nn_input, dtype=torch.float32).to(self.device)
@@ -223,19 +226,62 @@ class TrainedPlayer(Player):
         from_pos=(0,0)
         sorted_index = index[::-1]
        
+        #try_game = deepcopy(game)
+
         for _index in sorted_index:
+            try_game = deepcopy(game)
             pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
             from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
             #action=out[_index]
             self.last_action_value = out[_index]
             self.last_action_number=_index
-            ok = game._Game__move(from_pos, move, game.current_player_idx)
+
+            ok = try_game._Game__move(from_pos, move, game.current_player_idx)
             
             if ok:
-                break
-            
-             
+                break    
+
         return  (from_pos, move) #,action
+    
+class TrainedPlayer_Complete(Player):
+    def __init__(self, isfirst, path_first, path_second) -> None:
+        super().__init__()
+        # inserisci qui la rete
+        self.device = ("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.GeneratorNet_first = QuixoNet().to(self.device)
+        self.GeneratorNet_second = QuixoNet().to(self.device)
+        self.GeneratorNet_first.load_state_dict(torch.load(path_first))
+        self.GeneratorNet_second.load_state_dict(torch.load(path_second))
+        self.isfirst = isfirst
+       
+    def make_move(self, game: 'Game') -> tuple[tuple[int, int], Move]:
+        nn_input = game.get_flat_board()
+        nn_input = torch.tensor(nn_input, dtype=torch.float32).to(self.device)
+        out = self.GeneratorNet_first(nn_input) if self.isfirst else self.GeneratorNet_second(nn_input) # ritorna 44 uscite, da qui ricavare il numero dell'azione e la direzione della migliori
+        out = out.cpu().detach().numpy()
+        #print(out)
+        index = np.argsort(out)
+        pos,move=0,0
+        from_pos=(0,0)
+        sorted_index = index[::-1]
+
+        for _index in sorted_index:
+            try_game = deepcopy(game)
+            pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
+            from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
+            #action=out[_index]
+            self.last_action_value = out[_index] # nel caso in cui la rete sia già trainata non servono....(non ci sono tra gli attributi di TrainedNet_Complete)
+            self.last_action_number=_index # nel caso in cui la rete sia già trainata non servono....(non ci sono tra gli attributi di TrainedNet_Complete)
+            ok = try_game._Game__move(from_pos, move, game.current_player_idx)
+            
+            if ok:
+                break    
+
+        return  (from_pos, move) #,action
+    
+
+    def change_turn(self, turn: bool):
+        self.isfirst = turn
 
     
 def translate_number_to_position_direction(number)->tuple[int,Move]:
