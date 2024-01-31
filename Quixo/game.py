@@ -488,7 +488,7 @@ class Game(object):
     
 
 
-    def check_is_winning(self,from_pos,slide) -> int:  #return 1 for player 1 or 0 for player 0
+    def check_is_winning(self,) -> int:  #return 1 for player 1 or 0 for player 0
         '''Check the winner. Returns the player ID of the winner if any, otherwise returns -1'''
         self=deepcopy(self)
         #accetable=self.__slide(from_pos,slide);
@@ -758,7 +758,7 @@ class Game(object):
 
 
 
-    def  compute_reward(self,from_pos, slide) -> int :
+    def  compute_reward(self, from_pos, slide) -> int :
         '''Return  the sum of  maximium between positive rewards and the minimium between the negative one's  '''
         reward=0.1
         '''
@@ -773,9 +773,9 @@ class Game(object):
 
      
         '''
-        if self.check_is_winning(from_pos,slide)==0:
+        if self.check_is_winning()==0:
             reward = 1
-        if self.check_is_winning(from_pos,slide)==1:
+        if self.check_is_winning()==1:
             reward =-1
         
 
