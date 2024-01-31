@@ -7,15 +7,15 @@ Quixo is a two-player abstract strategy board game where players take turns shif
 
 
 # How is the code structured
-hyperparams_selection_genetic.ipynb => used in order to generate the hyperparameters of the network 
+**hyperparams_selection_genetic.ipynb** => used in order to generate the hyperparameters of the network 
 
-training_phase.ipynb => used in order to train an agent 
+**training_phase.ipynb** => used in order to train an agent 
 
-testing_phase.ipynb => We proposed a testing environment where there's the possibility to try our final trained agent both starting as first or second, thanks to the variable 'starts_first'. In case you would like to test the agent against more opponents, just plug them into the vector 'players' and for each game, there will be a different opponent
+**testing_phase.ipynb** => We proposed a testing environment where there's the possibility to try our final trained agent both starting as first or second, thanks to the variable 'starts_first'. In case you would like to test the agent against more opponents, just plug them into the vector 'players' and for each game, there will be a different opponent
 
-trained_models => here you could find the model parameters to feed into the Training_Complete structure along with a boolean value that specifies wether the model starts as first or second. The structure provides a function that let modify this value in order to start as second 
+**trained_models** => here you could find the model parameters to feed into the Training_Complete structure along with a boolean value that specifies wether the model starts as first or second. The structure provides a function that let modify this value in order to start as second 
 
-game.py => defines the Game, Player and QuixoNet (the NN used inside the Player) 
+**game.py** => defines the Game, Player and QuixoNet (the NN used inside the Player) 
 
 
 # Deep Reinforcement Learning
