@@ -79,14 +79,10 @@ class RandomPlayer(Player):
 class MyPlayer(Player):
     def __init__(self) -> None:
         super().__init__()
-        # inserisci qui la rete
         self.device = ("cuda:0" if torch.cuda.is_available() else "cpu")
         self.GeneratorNet = QuixoNet().to(self.device)
         self.TargetNet = QuixoNet().to(self.device)
         self.criterion = nn.SmoothL1Loss().to(self.device)
-        #self.criterion = nn.HuberLoss().to(self.device)
-        #self.criterion = nn.MSELoss().to(self.device)
-        #self.optimizer = torch.optim.SGD(self.GeneratorNet.parameters(), lr=0.001, momentum=0.9)
         self.optimizer = torch.optim.Adam(self.GeneratorNet.parameters(), lr=0.01)
 
         self.last_action_value = 0.0
@@ -99,19 +95,15 @@ class MyPlayer(Player):
         nn_input = torch.tensor(nn_input, dtype=torch.float32).to(self.device)
         out = self.GeneratorNet(nn_input) # ritorna 44 uscite, da qui ricavare il numero dell'azione e la direzione della migliori
         out = out.cpu().detach().numpy()
-        #print(out)
         index = np.argsort(out)
         pos,move=0,0
         from_pos=(0,0)
         sorted_index = index[::-1]
       
-        #try_game = deepcopy(game)
-
         for _index in sorted_index:
             try_game = deepcopy(game)
-            pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
-            from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
-            #action=out[_index]
+            pos, move = translate_number_to_position_direction(_index+1) #perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
+            from_pos = translate_number_to_position(pos) #from_pos =Tuple[int,int]direction
             self.last_action_value = out[_index]
             self.last_action_number=_index
 
@@ -120,47 +112,7 @@ class MyPlayer(Player):
             if ok:
                 break    
 
-        return  (from_pos, move) #,action
-     
-
-    def make_move2(self, game: 'Game') -> tuple[tuple[int, int], Move]:
-        decay_rate = 0.99
-        self.step = max(0.1, self.step* decay_rate)
-
-
-        if np.random.random() < self.step: #epsilon
-            nn_input = game.get_flat_board()
-            nn_input = torch.tensor(nn_input, dtype=torch.float32).to(self.device)
-            out = self.GeneratorNet(nn_input) # ritorna 44 uscite, da qui ricavare il numero dell'azione e la direzione della migliori
-            out = out.cpu().detach().numpy()
-            #print(out)
-            index = np.argsort(out)
-            pos,move=0,0
-            from_pos=(0,0)
-            sorted_index = index[::-1]
-        
-            for _index in sorted_index:
-                pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
-                from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
-                #action=out[_index]
-                self.last_action_value = out[_index]
-                self.last_action_number=_index
-                ok = game._Game__move(from_pos, move, game.current_player_idx)
-                
-                if ok:
-                    break
-                
-                
-            return  (from_pos, move) #,action
-        
-        else: 
-            ok=False
-            while not ok:
-                    from_pos = (random.randint(0, 4), random.randint(0, 4))
-                    move = random.choice([Move.TOP, Move.BOTTOM, Move.LEFT, Move.RIGHT])
-                    ok = game._Game__move(from_pos, move, game.current_player_idx)   
-                    self.last_action_number=translate_position_to_number(from_pos)
-            return (from_pos, move)
+        return  (from_pos, move)
     
     
     def myplayer_zero_grad(self):
@@ -202,15 +154,11 @@ class MyPlayer(Player):
              
         return  action_val
 
- 
- 
-    ##translate into (Position,Move)
 
 
 class TrainedPlayer(Player):
     def __init__(self) -> None:
         super().__init__()
-        # inserisci qui la rete
         self.device = ("cuda:0" if torch.cuda.is_available() else "cpu")
         self.GeneratorNet = QuixoNet().to(self.device)
        
@@ -220,19 +168,15 @@ class TrainedPlayer(Player):
         nn_input = torch.tensor(nn_input, dtype=torch.float32).to(self.device)
         out = self.GeneratorNet(nn_input) # ritorna 44 uscite, da qui ricavare il numero dell'azione e la direzione della migliori
         out = out.cpu().detach().numpy()
-        #print(out)
         index = np.argsort(out)
         pos,move=0,0
         from_pos=(0,0)
         sorted_index = index[::-1]
        
-        #try_game = deepcopy(game)
-
         for _index in sorted_index:
             try_game = deepcopy(game)
-            pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
-            from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
-            #action=out[_index]
+            pos, move = translate_number_to_position_direction(_index+1) #perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
+            from_pos = translate_number_to_position(pos) #from_pos =Tuple[int,int]direction
             self.last_action_value = out[_index]
             self.last_action_number=_index
 
@@ -241,12 +185,11 @@ class TrainedPlayer(Player):
             if ok:
                 break    
 
-        return  (from_pos, move) #,action
+        return  (from_pos, move)
     
 class TrainedPlayer_Complete(Player):
     def __init__(self, isfirst, path_first, path_second) -> None:
         super().__init__()
-        # inserisci qui la rete
         self.device = ("cuda:0" if torch.cuda.is_available() else "cpu")
         self.GeneratorNet_first = QuixoNet().to(self.device)
         self.GeneratorNet_second = QuixoNet().to(self.device)
@@ -259,7 +202,6 @@ class TrainedPlayer_Complete(Player):
         nn_input = torch.tensor(nn_input, dtype=torch.float32).to(self.device)
         out = self.GeneratorNet_first(nn_input) if self.isfirst else self.GeneratorNet_second(nn_input) # ritorna 44 uscite, da qui ricavare il numero dell'azione e la direzione della migliori
         out = out.cpu().detach().numpy()
-        #print(out)
         index = np.argsort(out)
         pos,move=0,0
         from_pos=(0,0)
@@ -267,17 +209,14 @@ class TrainedPlayer_Complete(Player):
 
         for _index in sorted_index:
             try_game = deepcopy(game)
-            pos, move = translate_number_to_position_direction(_index+1) ##perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
-            from_pos = translate_number_to_position(pos)#from_pos =Tuple[int,int]direction
-            #action=out[_index]
-            self.last_action_value = out[_index] # nel caso in cui la rete sia già trainata non servono....(non ci sono tra gli attributi di TrainedNet_Complete)
-            self.last_action_number=_index # nel caso in cui la rete sia già trainata non servono....(non ci sono tra gli attributi di TrainedNet_Complete)
+            pos, move = translate_number_to_position_direction(_index+1) # perchè index va da 0 a 43 noi abbiam mappato da 1 a 44
+            from_pos = translate_number_to_position(pos) # from_pos =Tuple[int,int]direction
             ok = try_game._Game__move(from_pos, move, game.current_player_idx)
             
             if ok:
                 break    
 
-        return  (from_pos, move) #,action
+        return  (from_pos, move)
     
 
     def change_turn(self, turn: bool):
@@ -399,7 +338,6 @@ def translate_number_to_position_direction(number)->tuple[int,Move]:
                return (16, Move.TOP)
         elif number == 44:
                return (16, Move.BOTTOM)
-        
 
 def translate_number_to_position(number)->tuple[int, int]:
        '''Translate Position (1-16) into row,col'''
@@ -486,142 +424,6 @@ class Game(object):
             return self._board[0, -1]
         return -1
     
-
-
-    def check_is_winning(self,) -> int:  #return 1 for player 1 or 0 for player 0
-        '''Check the winner. Returns the player ID of the winner if any, otherwise returns -1'''
-        self=deepcopy(self)
-        #accetable=self.__slide(from_pos,slide);
-        #def __move(self, from_pos: tuple[int, int], slide: Move, player_id: int) -> bool:
-        # for each row
-        for x in range(self._board.shape[0]):
-            # if a player has completed an entire row
-            if self._board[x, 0] != -1 and all(self._board[x, :] == self._board[x, 0]):
-                # return the relative id
-                return self._board[x, 0]
-        # for each column
-        for y in range(self._board.shape[1]):
-            # if a player has completed an entire column
-            if self._board[0, y] != -1 and all(self._board[:, y] == self._board[0, y]):
-                # return the relative id
-                return self._board[0, y]
-        # if a player has completed the principal diagonal
-        if self._board[0, 0] != -1 and all(
-            [self._board[x, x]
-                for x in range(self._board.shape[0])] == self._board[0, 0]
-        ):
-            # return the relative id
-            return self._board[0, 0]
-        # if a player has completed the secondary diagonal
-        if self._board[0, -1] != -1 and all(
-            [self._board[x, -(x + 1)]
-             for x in range(self._board.shape[0])] == self._board[0, -1]
-        ):
-            # return the relative id
-            return self._board[0, -1]
-        return -1
-    
-    def check_2_pattern(self, from_pos, slide) -> int:  #return 1 for player 1 or 0 for player 0
-            '''Check if the move get a in a state with at least 2 simbols in a row, otherwise returns -1'''
-            n=2
-        # for each row
-            for x in range(self._board.shape[0]):
-                # if a player has completed an entire row
-                if self._board[x, 0] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
-                    # self the relative id
-                    return 1
-            # for each column
-            for y in range(self._board.shape[1]):
-                # if a player has completed an entire column
-                if self._board[0, y] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
-                    # return the relative id
-                    return 1
-            # if a player has completed the principal diagonal
-            if self._board[0, 0] == 0 and sum(
-                [self._board[x, x]
-                    for x in range(self._board.shape[0])] == self._board[0, 0]
-            )>=n:
-                # return the relative id
-                return 1
-            # if a player has completed the secondary diagonal
-            if self._board[0, -1] == 0 and sum(
-                [self._board[x, -(x + 1)]
-                for x in range(self._board.shape[0])] == self._board[0, -1]
-            )>=n:
-                # return the relative id
-                return 1
-            return -1
-    
-    def check_3_pattern(self, from_pos, slide) -> int:  #return 1 for player 1 or 0 for player 0
-        
-            '''Check if the move get a in a state with at least 3 simbols in a row, otherwise returns -1'''
-            n=3
-            self=deepcopy(self)
-            accetable=self.__slide(from_pos,slide);
-        # for each row
-            for x in range(self._board.shape[0]):
-                # if a player has completed an entire row
-                if self._board[x, 0] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
-                    # return the relative id
-                    return 1
-            # for each column
-            for y in range(self._board.shape[1]):
-                # if a player has completed an entire column
-                if self._board[0, y] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
-                    # return the relative id
-                    return 1
-            # if a player has completed the principal diagonal
-            if self._board[0, 0] == 0 and sum(
-                [self._board[x, x]
-                    for x in range(self._board.shape[0])] == self._board[0, 0]
-            )>=n:
-                # return the relative id
-                return 1
-            # if a player has completed the secondary diagonal
-            if self._board[0, -1] == 0 and sum(
-                [self._board[x, -(x + 1)]
-                for x in range(self._board.shape[0])] == self._board[0, -1]
-            )>=n:
-                # return the relative id
-                return 1
-            return -1
-    
-    def check_4_pattern(self, from_pos, slide) -> int:  #return 1 for player 1 or 0 for player 0
-        
-            '''Check if the move get a in a state with at least 4 simbols in a row, otherwise returns -1'''
-            n=4
-            self=deepcopy(self)
-            accetable=self.__slide(from_pos,slide)
-            
-        # for each row
-            for x in range(self._board.shape[0]):
-                # if a player has completed an entire row
-                if self._board[x, 0] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
-                    # return the relative id
-                    return 1
-            # for each column
-            for y in range(self._board.shape[1]):
-                # if a player has completed an entire column
-                if self._board[0, y] == 0 and sum(self._board[x, :] == self._board[x, 0]) >= n:
-                    # return the relative id
-                    return 1
-            # if a player has completed the principal diagonal
-            if self._board[0, 0] == 0 and sum(
-                [self._board[x, x]
-                    for x in range(self._board.shape[0])] == self._board[0, 0]
-            )>=n:
-                # return the relative id
-                return 1
-            # if a player has completed the secondary diagonal
-            if self._board[0, -1] == 0  and sum(
-                [self._board[x, -(x + 1)]
-                for x in range(self._board.shape[0])] == self._board[0, -1]
-            )>=n:
-                # return the relative id
-                return 1
-            return -1
-    
-
 
     def play(self, player1: Player, player2: Player):
         '''Play the game. Returns the winning player'''
@@ -758,30 +560,14 @@ class Game(object):
 
 
 
-    def  compute_reward(self, from_pos, slide) -> int :
-        '''Return  the sum of  maximium between positive rewards and the minimium between the negative one's  '''
+    def  compute_reward(self) -> int :
         reward=0.1
-        '''
-        if self.check_2_pattern(from_pos,slide):
-            reward= 0.2
-            
-        if self.check_3_pattern(from_pos,slide):
-            reward= 0.3;
-            
-        if self.check_4_pattern(from_pos,slide):
-            reward= 0.4;
 
-     
-        '''
-        if self.check_is_winning()==0:
+        if self.check_winner()==0:
             reward = 1
-        if self.check_is_winning()==1:
+        if self.check_winner()==1:
             reward =-1
         
-
-        #reward6=self.__accettable(from_pos,slide,num)
-        
-        #return max(rewards_list)+min(reward6,-0.4)
         return reward
         
     
