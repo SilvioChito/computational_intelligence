@@ -63,3 +63,5 @@ Consequently, we concluded that the training against a random opponent was enoug
 We present a Deep Q-Learning model by leveraging GA for hyperparameters initialization, trained only against a random opponent. In this way, we highlight the importance of carefully evaluating training strategies and considering the trade-offs between complexity, computational resources, and performance gains in reinforcement learning tasks.
 In our final assessment, we achieved significant success with our Quixo agent, reaching a more than acceptable accuracy (87-92%) by using a light neural networks (only 17k parameters per model turn version)
 
+Code developed jointly with Michelangelo Caretto
+
