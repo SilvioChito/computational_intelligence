@@ -7,7 +7,7 @@ Quixo is a two-player abstract strategy board game where players take turns shif
 
 
 # How is the code structured
-**hyperparams_selection_genetic.ipynb** => used in order to generate the hyperparameters of the network 
+**hyperparams_selection_genetic.ipynb**: used in order to generate the hyperparameters of the network 
 
 - **training_phase.ipynb**: used in order to train an agent 
 
